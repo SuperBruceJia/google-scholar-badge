@@ -25,8 +25,9 @@ async def get_citation_number(user_id: str):
 
     # If not in cache or expired, fetch from Google Scholar
     print(f"Fetching new result for user: {user_id}")
-    url = f"https://scholar.google.com/citations?user={user_id}"
-    async with httpx.AsyncClient(timeout=10.0) as client: # Added timeout
+    # Always use scholar.google.com and hl=en for consistency
+    url = f"https://scholar.google.com/citations?user={user_id}&hl=en"
+    async with httpx.AsyncClient(timeout=10.0) as client:
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
@@ -35,6 +36,8 @@ async def get_citation_number(user_id: str):
         }
         try:
             response = await client.get(url, headers=headers, follow_redirects=True)
+            # Log status code for debugging
+            print(f"Request to {url} completed with status code: {response.status_code}")
             response.raise_for_status() # Raise HTTPError for bad responses (4xx or 5xx)
         except httpx.RequestError as exc:
             print(f"An error occurred while requesting {exc.request.url!r}: {exc}")
@@ -43,6 +46,8 @@ async def get_citation_number(user_id: str):
             print(f"Error response {exc.response.status_code} while requesting {exc.request.url!r}: {exc.response.text}")
             return None # Or handle error appropriately
 
+        # Log the first 500 chars of the response text if parsing fails later
+        html_snippet = response.text[:500]
         soup = BeautifulSoup(response.text, 'html.parser')
 
         # Find the stats table by its ID
