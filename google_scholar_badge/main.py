@@ -63,22 +63,23 @@ async def get_citation_number(user_id: str):
 
 @app.get("/citations")
 async def get_citations(user: str):
-    # url = f"https://scholar.google.com/citations?user={user}"
-    citation_count = await get_citation_number(user) # Pass user_id here
+    citation_count = await get_citation_number(user)
+    print(f"Raw citation_count for user {user}: {repr(citation_count)}") # Log the raw value
 
-    # Default message to integer 0 if citation_count is None or cannot be converted
-    message_value = 0
+    message_value = "0" # Default to string "0"
     if citation_count:
         try:
-            message_value = int(citation_count)
+            # Try converting to int first to validate it's numeric
+            numeric_value = int(citation_count)
+            message_value = str(numeric_value) # Convert back to string for the response
         except (ValueError, TypeError):
-            print(f"Could not convert citation count '{citation_count}' to integer for user {user}. Defaulting to 0.")
-            message_value = 0 # Ensure it's 0 if conversion fails
+            print(f"Could not convert citation count '{citation_count}' to integer for user {user}. Defaulting to \"0\".")
+            message_value = "0" # Ensure it's string "0" if conversion fails
 
     return {
         "schemaVersion": 1,
         "label": "Citations",
-        "message": message_value, # Ensure message is always an integer
+        "message": message_value, # Ensure message is always a string
         "style": "social",
         "namedLogo": "Google Scholar"
     }
