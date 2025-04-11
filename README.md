@@ -21,7 +21,7 @@ I have developed a simple API to fetch your Google Scholar citation count and ge
 
 ## Example Badge
 
-![](https://img.shields.io/endpoint?url=https%3A%2F%2Fgoogle-scholar-badge.vercel.app%2Fcitations%3Fuser%3D8Ez_u30AAAAJ)
+[![](https://img.shields.io/endpoint?url=https%3A%2F%2Fgoogle-scholar-badge.vercel.app%2Fcitations%3Fuser%3D8Ez_u30AAAAJ)](https://scholar.google.com/citations?user=8Ez_u30AAAAJ)
 
 ## Known Limitations
 
