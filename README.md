@@ -1,6 +1,6 @@
 # Google Scholar Citation Badge
 
-![](https://img.shields.io/badge/build-passing-brightgreen)
+[![Deploy to Vercel](https://github.com/dexhunter/google-scholar-badge/actions/workflows/deploy.yml/badge.svg)](https://github.com/dexhunter/google-scholar-badge/actions/workflows/deploy.yml)
 
 Get your Google Scholar citation badge!
 
@@ -15,13 +15,13 @@ I have developed a simple API to fetch your Google Scholar citation count and ge
 ## Usage
 
 1. Go to [shields.io endpoint badge](https://shields.io/badges/endpoint-badge)
-2. Set the endpoint to `https://google-scholar-badge.replit.app/citations?user={user}` Replace `{user}` with your Google Scholar User ID
+2. Set the endpoint to `https://google-scholar-badge-23ypw1sq8-dexhunters-projects.vercel.app/citations?user={user}` Replace `{user}` with your Google Scholar User ID
 
 Can also view the open source code [here on replit](https://replit.com/@dexhunter/google-badge?v=1#main.py)
 
 ## Example Badge
 
-![](https://img.shields.io/endpoint?url=https%3A%2F%2Fgoogle-scholar-badge.replit.app%2Fcitations%3Fuser%3D8Ez_u30AAAAJ)
+![](https://img.shields.io/endpoint?url=https%3A%2F%2Fgoogle-scholar-badge-23ypw1sq8-dexhunters-projects.vercel.app%2Fcitations%3Fuser%3D8Ez_u30AAAAJ)
 
 
 ## Work In Progress (WIP)
