@@ -1,8 +1,8 @@
-# Google Scholar Citation Badge
+# Google Scholar Citation Tracker Badge
 
 [![Deploy to Vercel](https://github.com/dexhunter/google-scholar-badge/actions/workflows/deploy.yml/badge.svg)](https://github.com/dexhunter/google-scholar-badge/actions/workflows/deploy.yml)
 
-Get your Google Scholar citation badge!
+Get your Google Scholar citation tracker badge!
 
 I have developed a simple API to fetch your Google Scholar citation count and generate a badge for your profile. This badge can be easily integrated into your GitHub profile or used in various projects to showcase your citation count.
 
