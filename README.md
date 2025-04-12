@@ -17,7 +17,7 @@ I have developed a simple API to fetch your Google Scholar citation count and ge
 1. Go to [shields.io endpoint badge](https://shields.io/badges/endpoint-badge)
 2. Set the endpoint to `https://google-scholar-badge.vercel.app/citations?user={user}` Replace `{user}` with your Google Scholar User ID
 
-<!-- Can also view the open source code [here on replit](https://replit.com/@dexhunter/google-badge?v=1#main.py) -->
+Can also view a playwright version [here on replit](https://replit.com/@dexhunter/google-scholar-citation-tracker)
 
 ## Example Badge
 
