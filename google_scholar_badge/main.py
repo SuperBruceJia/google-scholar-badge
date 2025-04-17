@@ -12,7 +12,7 @@ app = FastAPI()
 
 # Simple in-memory cache with expiration
 cache = {}
-CACHE_DURATION = timedelta(hours=4)
+CACHE_DURATION = timedelta(hours=24)
 
 # Define SerpApi base URL
 SERPAPI_BASE_URL = "https://serpapi.com/search.json"
