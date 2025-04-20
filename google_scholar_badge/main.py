@@ -30,7 +30,7 @@ else:
 
 # Define SerpApi base URL
 SERPAPI_BASE_URL = "https://serpapi.com/search.json"
-REDIS_CACHE_TTL_SECONDS = 24 * 60 * 60 # 24 hours in seconds
+REDIS_CACHE_TTL_SECONDS = 302400 # 3.5 days in seconds
 
 async def get_citation_number(user_id: str):
     # --- Check Redis Cache ---
