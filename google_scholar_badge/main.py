@@ -18,17 +18,13 @@ redis_client = None
 if REDIS_URL:
     print("Connecting to Redis...")
     try:
-        # Use from_url for easier configuration
         redis_client = redis.from_url(REDIS_URL, decode_responses=True) # Decode responses to strings
-        # You might need specific SSL settings depending on your Redis provider
-        # redis_client = redis.from_url(REDIS_URL, decode_responses=True, ssl_cert_reqs=None) # Example for disabling SSL verification if needed
     except Exception as e:
         print(f"Error connecting to Redis: {e}")
         redis_client = None # Ensure client is None if connection fails
 else:
     print("REDIS_URL environment variable not set. Redis caching disabled.")
 
-# Define SerpApi base URL
 SERPAPI_BASE_URL = "https://serpapi.com/search.json"
 REDIS_CACHE_TTL_SECONDS = 302400 # 3.5 days in seconds
 
