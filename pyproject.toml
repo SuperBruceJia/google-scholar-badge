@@ -12,6 +12,8 @@ uvicorn = "^0.31.0"
 beautifulsoup4 = "^4.12.3"
 fastapi = "^0.115.0"
 httpx = "^0.27.2"
+python-dotenv = "^1.0.1"
+redis = "^5.0.7"
 
 [tool.pyright]
 # https://github.com/microsoft/pyright/blob/main/docs/configuration.md

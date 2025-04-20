@@ -5,41 +5,62 @@ import httpx # Re-add httpx
 import uvicorn
 from datetime import datetime, timedelta
 from dotenv import load_dotenv # Add dotenv import
+import redis.asyncio as redis # Add redis import
+import json # Add json import
 
 load_dotenv() # Load environment variables from .env file
 
 app = FastAPI()
 
-# Simple in-memory cache with expiration
-cache = {}
-CACHE_DURATION = timedelta(hours=24)
+# --- Redis Initialization ---
+REDIS_URL = os.getenv("REDIS_URL")
+redis_client = None
+if REDIS_URL:
+    print("Connecting to Redis...")
+    try:
+        # Use from_url for easier configuration
+        redis_client = redis.from_url(REDIS_URL, decode_responses=True) # Decode responses to strings
+        # You might need specific SSL settings depending on your Redis provider
+        # redis_client = redis.from_url(REDIS_URL, decode_responses=True, ssl_cert_reqs=None) # Example for disabling SSL verification if needed
+    except Exception as e:
+        print(f"Error connecting to Redis: {e}")
+        redis_client = None # Ensure client is None if connection fails
+else:
+    print("REDIS_URL environment variable not set. Redis caching disabled.")
 
 # Define SerpApi base URL
 SERPAPI_BASE_URL = "https://serpapi.com/search.json"
+REDIS_CACHE_TTL_SECONDS = 24 * 60 * 60 # 24 hours in seconds
 
 async def get_citation_number(user_id: str):
-    # Check cache first
-    now = datetime.now()
-    if user_id in cache:
-        cached_result, timestamp = cache[user_id]
-        if now - timestamp < CACHE_DURATION:
-            print(f"Returning cached result for user: {user_id}")
-            # Ensure cached result is a dict with 'status'
-            if isinstance(cached_result, dict) and 'status' in cached_result:
-                return cached_result
+    # --- Check Redis Cache ---
+    if redis_client:
+        try:
+            cached_data_str = await redis_client.get(user_id)
+            if cached_data_str:
+                print(f"Returning cached result from Redis for user: {user_id}")
+                cached_data = json.loads(cached_data_str) # Parse JSON string
+                # Basic validation - could be more robust
+                if isinstance(cached_data, dict) and 'status' in cached_data:
+                     return cached_data
+                else:
+                    print(f"Invalid cache format in Redis for user: {user_id}, refetching...")
+                    # Optionally delete invalid key: await redis_client.delete(user_id)
             else:
-                # Clear invalid cache entry
-                print(f"Invalid cache format for user: {user_id}, refetching...")
-                del cache[user_id]
-        else:
-            print(f"Cache expired for user: {user_id}")
-            del cache[user_id]
+                 print(f"Cache miss in Redis for user: {user_id}")
+        except redis.RedisError as e:
+            print(f"Redis Error getting cache for {user_id}: {e}. Proceeding without cache.")
+        except json.JSONDecodeError as e:
+            print(f"Error decoding cached JSON for {user_id}: {e}. Refetching.")
+            # Optionally delete invalid key: await redis_client.delete(user_id)
+    else:
+        # If Redis client isn't initialized, skip caching logic
+        pass
 
-    # Get API key from environment variable
+    # --- Fetch from SerpApi (if not cached or Redis unavailable) ---
     api_key = os.getenv("SERPAPI_API_KEY")
     if not api_key:
         print("ERROR: SERPAPI_API_KEY environment variable not set.")
-        # Return an error immediately, don't cache this config issue
         return {"status": "error", "value": "Server Configuration Error"}
 
     print(f"Fetching new result for user: {user_id} using SerpApi")
@@ -47,74 +68,69 @@ async def get_citation_number(user_id: str):
         "engine": "google_scholar_author",
         "author_id": user_id,
         "api_key": api_key,
-        "hl": "en", # Keep language consistency
+        "hl": "en",
     }
 
-    async with httpx.AsyncClient(timeout=20.0) as client: # Increased timeout slightly
+    result = {"status": "error", "value": "Unknown Fetch Error"} # Default result
+
+    async with httpx.AsyncClient(timeout=20.0) as client:
         try:
             response = await client.get(SERPAPI_BASE_URL, params=params)
             print(f"Request to SerpApi for {user_id} completed with status code: {response.status_code}")
-            response.raise_for_status() # Raise exception for 4xx/5xx status codes
+            response.raise_for_status()
             data = response.json()
 
-            # Check for SerpApi-level errors first
             if "error" in data:
                  error_message = data["error"]
                  print(f"SerpApi returned an error for user {user_id}: {error_message}")
                  result = {"status": "error", "value": f"SerpApi Error: {error_message}"}
-                 # Cache SerpApi errors as they might be persistent (e.g., invalid key)
-                 cache[user_id] = (result, now)
-                 return result
 
-            # Extract citation count - Structure based on SerpApi Google Scholar Author docs
-            # Look in 'cited_by' first, then potentially 'author_results' or similar if needed
-            cited_by_info = data.get('cited_by')
-            if cited_by_info and 'value' in cited_by_info:
-                 citation_count = cited_by_info['value']
-                 print(f"Successfully parsed citation count: {citation_count} for user: {user_id} from SerpApi")
-                 result = {"status": "success", "value": str(citation_count)} # Ensure value is string
-                 cache[user_id] = (result, now)
-                 return result
-            # Fallback: Check if citation count is in the table structure (less common for author endpoint?)
-            elif 'cited_by' in data and 'table' in data['cited_by']:
-                for item in data['cited_by']['table']:
-                    if 'citations' in item and 'all' in item['citations']:
-                        citation_count = item['citations']['all']
-                        print(f"Successfully parsed citation count from table: {citation_count} for user: {user_id}")
-                        result = {"status": "success", "value": str(citation_count)}
-                        cache[user_id] = (result, now)
-                        return result
+            else:
+                cited_by_info = data.get('cited_by')
+                citation_count = None
+                if cited_by_info and 'value' in cited_by_info:
+                     citation_count = cited_by_info['value']
+                     print(f"Successfully parsed citation count: {citation_count} for user: {user_id} from SerpApi")
+                elif 'cited_by' in data and 'table' in data['cited_by']:
+                    for item in data['cited_by']['table']:
+                        if 'citations' in item and 'all' in item['citations']:
+                            citation_count = item['citations']['all']
+                            print(f"Successfully parsed citation count from table: {citation_count} for user: {user_id}")
+                            break # Found it
 
-            # If no citation count found in expected places
-            print(f"Could not find citation count in SerpApi response for user: {user_id}. Response keys: {list(data.keys())}")
-            result = {"status": "not_found", "value": None}
-            cache[user_id] = (result, now)
-            return result
+                if citation_count is not None:
+                    result = {"status": "success", "value": str(citation_count)}
+                else:
+                    print(f"Could not find citation count in SerpApi response for user: {user_id}. Response keys: {list(data.keys())}")
+                    result = {"status": "not_found", "value": None}
 
         except httpx.RequestError as exc:
             print(f"An HTTP Request error occurred while contacting SerpApi for {user_id}: {exc}")
             result = {"status": "error", "value": "Network Error"}
-            # Don't cache temporary network errors aggressively
-            # cache[user_id] = (result, now) # Optional: Cache network errors
-            return result
         except httpx.HTTPStatusError as exc:
             print(f"HTTP Status error {exc.response.status_code} while contacting SerpApi for {user_id}: {exc.response.text[:200]}...")
             error_value = f"API Error {exc.response.status_code}"
-            # Check if the error might be due to invalid API key or usage limits
-            if exc.response.status_code == 401 or exc.response.status_code == 403:
-                 error_value = "Authentication Error" # More specific message
+            if exc.response.status_code in [401, 403]:
+                 error_value = "Authentication Error"
             elif exc.response.status_code == 429:
                  error_value = "Rate Limit Exceeded"
             result = {"status": "error", "value": error_value}
-            # Cache API status errors as they might persist
-            cache[user_id] = (result, now)
-            return result
-        except Exception as e: # Catch unexpected errors during processing
+        except Exception as e:
             print(f"An unexpected error occurred processing SerpApi response for {user_id}: {e}")
             result = {"status": "error", "value": "Processing Error"}
-            # Cache unexpected errors cautiously
-            cache[user_id] = (result, now)
-            return result
+
+    # --- Store result in Redis Cache ---
+    if redis_client and isinstance(result, dict): # Only cache if Redis is available and result is valid
+        try:
+            result_str = json.dumps(result) # Serialize dict to JSON string
+            await redis_client.set(user_id, result_str, ex=REDIS_CACHE_TTL_SECONDS)
+            print(f"Stored result in Redis cache for user: {user_id} with TTL {REDIS_CACHE_TTL_SECONDS}s")
+        except redis.RedisError as e:
+            print(f"Redis Error setting cache for {user_id}: {e}")
+        except TypeError as e:
+             print(f"Error serializing result to JSON for caching for user {user_id}: {e}")
+
+    return result # Return the fetched/processed result
 
 @app.get("/citations")
 async def get_citations(user: str):
@@ -160,4 +176,6 @@ async def get_citations(user: str):
 if __name__ == '__main__':
     # Get port from environment variable or default to 8080
     port = int(os.getenv("PORT", 8080))
-    uvicorn.run("main:app", host="0.0.0.0", port=port) # Use host/port suitable for deployment
+    # Make sure redis client is closed gracefully on shutdown if needed
+    # uvicorn.run has lifecycle events, but for simplicity, we rely on OS closing connection
+    uvicorn.run("main:app", host="0.0.0.0", port=port)
