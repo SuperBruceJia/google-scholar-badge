@@ -21,7 +21,7 @@ app = FastAPI()
 
 # ── Redis ──────────────────────────────────────────────────────────────────────
 REDIS_URL = os.getenv("REDIS_URL")
-REDIS_CACHE_TTL_SUCCESS = 302_400  # 3.5 days
+REDIS_CACHE_TTL_SUCCESS = 604_800  # 7 days
 REDIS_CACHE_TTL_ERROR = 600        # 10 minutes
 
 redis_client = None
