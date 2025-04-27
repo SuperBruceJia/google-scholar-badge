@@ -1,36 +1,41 @@
 # Google Scholar Citation Tracker Badge
 
-[![Deploy to Vercel](https://github.com/dexhunter/google-scholar-badge/actions/workflows/deploy.yml/badge.svg)](https://github.com/dexhunter/google-scholar-badge/actions/workflows/deploy.yml)
+[![Deploy](https://github.com/dexhunter/google-scholar-badge/actions/workflows/deploy.yml/badge.svg)](https://github.com/dexhunter/google-scholar-badge/actions/workflows/deploy.yml)
 
-Get your Google Scholar citation tracker badge!
+Display your live Google Scholar citation count anywhere you can use a Shields badge.
 
-I have developed a simple API to fetch your Google Scholar citation count and generate a badge for your profile. This badge can be easily integrated into your GitHub profile or used in various projects to showcase your citation count.
-
-## Features
-
-- Fetch your Google Scholar citation count
-- Generate a badge with your citation count
-- Easy to integrate into your GitHub profile or projects
+---
 
 ## Usage
 
-1. Go to [shields.io endpoint badge](https://shields.io/badges/endpoint-badge)
-2. Set the endpoint to `https://google-scholar-badge.vercel.app/citations?user={user}` Replace `{user}` with your Google Scholar User ID
+1. Find your Google Scholar author ID (the `user=XXXX` part of the profile URL).  
+2. Go to *Shields Endpoint Badge* and set the endpoint to:  
+   `https://google-scholar-badge.vercel.app/citations?user=YOUR_ID`  
+3. Add the generated markdown anywhere you like.
 
-Can also view a playwright version [here on replit](https://replit.com/@dexhunter/google-scholar-citation-tracker)
+### Copy-paste badge snippet
 
-## Example Badge
+`[![](https://img.shields.io/endpoint?url=https%3A%2F%2Fgoogle-scholar-badge.vercel.app%2Fcitations%3Fuser%3DYOUR_ID)](https://scholar.google.com/citations?user=YOUR_ID)`
+
+Replace **YOUR_ID** with your own author ID.
+
+---
+
+## Example
 
 [![](https://img.shields.io/endpoint?url=https%3A%2F%2Fgoogle-scholar-badge.vercel.app%2Fcitations%3Fuser%3D8Ez_u30AAAAJ)](https://scholar.google.com/citations?user=8Ez_u30AAAAJ)
 
-## ❗ Known Limitations
+---
 
-Google Scholar employs anti-bot measures that often block requests coming directly from server environments like Vercel (where this service is hosted). When a request is blocked (resulting in a `403 Forbidden` error), the service cannot retrieve the citation count and will default to displaying "0".
+## ⚠️ Limitations
 
-Attempts to mitigate this using standard browser headers have been insufficient for reliable operation. For consistent results, alternative methods like using a dedicated third-party scraping API or manual updates might be necessary.
+* **SerpApi rate limits:** the free tier allows 100 requests / month. When exhausted, the badge shows “Rate limit” for about 10 minutes.
+* **Redis optional:** without it every badge request hits SerpApi (slower and uses more credits).
 
-## Work In Progress (WIP)
+---
 
-* deploy the service to heroku or other cloud services
-* more badges (hindex, i10index, etc.)
-* some tests
+## Roadmap (🛠 WIP)
+
+* Badges for *h-index*, *i10-index*, yearly citations  
+* Docker image & one-command deployment  
+* Integration tests
