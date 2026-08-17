@@ -1,7 +1,5 @@
 # Google Scholar Citation Tracker Badge
 
-[![Deploy](https://github.com/dexhunter/google-scholar-badge/actions/workflows/deploy.yml/badge.svg)](https://github.com/dexhunter/google-scholar-badge/actions/workflows/deploy.yml)
-
 Display your live Google Scholar citation count, h-index and i10-index anywhere you can use a Shields badge.
 
 ---
