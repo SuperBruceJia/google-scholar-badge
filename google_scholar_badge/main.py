@@ -1,9 +1,10 @@
 # main.py
+import json
 import os
-from datetime import datetime, timedelta
 
 import httpx
 import redis.asyncio as redis
+import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from tenacity import (
@@ -12,8 +13,6 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential,
 )
-import json
-import uvicorn
 
 load_dotenv()
 
@@ -23,6 +22,7 @@ app = FastAPI()
 REDIS_URL = os.getenv("REDIS_URL")
 REDIS_CACHE_TTL_SUCCESS = 604_800  # 7 days
 REDIS_CACHE_TTL_ERROR = 600        # 10 minutes
+REDIS_KEY_PREFIX = "metrics:"      # new format: all metrics in one entry
 
 redis_client = None
 if REDIS_URL:
@@ -33,6 +33,15 @@ if REDIS_URL:
         print(f"Error connecting to Redis: {e}")
 else:
     print("REDIS_URL env var not set – caching disabled.")
+
+# ── Metrics ────────────────────────────────────────────────────────────────────
+# SerpApi returns all three in the same `cited_by.table`, so one request
+# is enough to serve every badge.
+METRIC_LABELS = {
+    "citations": "Citations",
+    "h_index": "h-index",
+    "i10_index": "i10-index",
+}
 
 # ── SerpApi ────────────────────────────────────────────────────────────────────
 SERPAPI_BASE_URL = "https://serpapi.com/search.json"
@@ -53,11 +62,24 @@ async def fetch_serpapi(params: dict) -> dict:
         return response.json()
 
 
-async def get_citation_number(user_id: str) -> dict:
+def parse_metrics(data: dict) -> dict:
+    """Pull the all-time citations / h-index / i10-index out of `cited_by.table`."""
+    metrics = {}
+    table = data.get("cited_by", {}).get("table") or []
+    for row in table:
+        for name in METRIC_LABELS:
+            if (value := row.get(name, {}).get("all")) is not None:
+                metrics[name] = value
+    return metrics
+
+
+async def get_author_metrics(user_id: str) -> dict:
+    cache_key = REDIS_KEY_PREFIX + user_id
+
     # ── 1) Try Redis ──────────────────────────────────────────────────────────
     if redis_client:
         try:
-            cached = await redis_client.get(user_id)
+            cached = await redis_client.get(cache_key)
             if cached:
                 return json.loads(cached)
         except Exception as e:
@@ -78,18 +100,9 @@ async def get_citation_number(user_id: str) -> dict:
         if "error" in data:
             result = {"status": "error", "value": f"SerpApi: {data['error']}"}
         else:
-            citation_count = None
-            cb = data.get("cited_by")
-            if cb and "value" in cb:
-                citation_count = cb["value"]
-            elif cb and "table" in cb:
-                for row in cb["table"]:
-                    if (cits := row.get("citations", {}).get("all")) is not None:
-                        citation_count = cits
-                        break
-
-            if citation_count is not None:
-                result = {"status": "success", "value": str(citation_count)}
+            metrics = parse_metrics(data)
+            if metrics:
+                result = {"status": "success", "metrics": metrics}
             else:
                 result = {"status": "not_found", "value": None}
 
@@ -102,6 +115,7 @@ async def get_citation_number(user_id: str) -> dict:
         else:
             result = {"status": "error", "value": f"API {code}"}
     except Exception as e:
+        print(f"Processing error for {user_id}: {e}")
         result = {"status": "error", "value": "Network/processing error"}
 
     # ── 3) Cache if appropriate ───────────────────────────────────────────────
@@ -113,40 +127,53 @@ async def get_citation_number(user_id: str) -> dict:
                 if status in {"success", "not_found"}
                 else REDIS_CACHE_TTL_ERROR
             )
-            # Optionally skip caching for errors altogether by uncommenting:
-            # if status not in {"success", "not_found"}: return result
-            await redis_client.set(user_id, json.dumps(result), ex=ttl)
+            await redis_client.set(cache_key, json.dumps(result), ex=ttl)
         except Exception as e:
             print(f"Redis write error for {user_id}: {e}")
 
     return result
 
 
-# ── FastAPI route ─────────────────────────────────────────────────────────────
-@app.get("/citations")
-async def citations(user: str):
-    res = await get_citation_number(user)
-    status, value = res.get("status"), res.get("value")
+async def build_badge(user_id: str, metric: str) -> dict:
+    res = await get_author_metrics(user_id)
+    status = res.get("status")
 
     msg, color = "Error", "red"
     if status == "success":
-        try:
-            msg, color = str(int(value)), "brightgreen"
-        except Exception:
-            pass
+        value = res.get("metrics", {}).get(metric)
+        if value is None:
+            msg, color = "Not found", "yellow"
+        else:
+            msg, color = str(value), "brightgreen"
     elif status == "not_found":
         msg, color = "Not found", "yellow"
     else:  # error
-        msg = value or "Error"
+        msg = res.get("value") or "Error"
 
     return {
         "schemaVersion": 1,
-        "label": "Citations",
+        "label": METRIC_LABELS[metric],
         "message": msg,
         "color": color,
         "style": "social",
         "namedLogo": "Google Scholar",
     }
+
+
+# ── FastAPI routes ────────────────────────────────────────────────────────────
+@app.get("/citations")
+async def citations(user: str):
+    return await build_badge(user, "citations")
+
+
+@app.get("/h-index")
+async def h_index(user: str):
+    return await build_badge(user, "h_index")
+
+
+@app.get("/i10-index")
+async def i10_index(user: str):
+    return await build_badge(user, "i10_index")
 
 
 if __name__ == "__main__":
